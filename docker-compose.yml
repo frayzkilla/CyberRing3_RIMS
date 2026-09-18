@@ -1,0 +1,70 @@
+services:
+  nginx:
+    image: ${REGISTRY_IMAGE:-exhibition_of_exhibits}/nginx:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: nginx.Dockerfile
+    ports:
+      - ${PORT}:80
+    depends_on:
+      app:
+        condition: service_healthy
+      cleaner:
+        condition: service_started
+    stop_grace_period: 3s
+    mem_limit: 1G
+    memswap_limit: 1G
+    cpu_count: 1
+    pids_limit: 128
+    ulimits:
+      nofile:
+        soft: 8192
+        hard: 8192
+
+  app:
+    image: ${REGISTRY_IMAGE:-exhibition_of_exhibits}/app:${IMAGE_TAG:-latest}
+    build: .
+    command: ./app
+    restart: always
+    volumes:
+      - database:/database/
+      - jwt_secret:/app/jwt_secret/
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--output-document=/dev/null", "http://localhost:8000/api/museums"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    stop_grace_period: 3s
+    mem_limit: 1G
+    memswap_limit: 1G
+    cpu_count: 1
+    pids_limit: 128
+    ulimits:
+      nofile:
+        soft: 8192
+        hard: 8192
+
+  cleaner:
+    image: ${REGISTRY_IMAGE:-exhibition_of_exhibits}/cleaner:${IMAGE_TAG:-latest}
+    build: cleaner
+    depends_on:
+      app:
+        condition: service_started
+    stop_grace_period: 3s
+    mem_limit: 1G
+    memswap_limit: 1G
+    cpu_count: 1
+    pids_limit: 128
+    ulimits:
+      nofile:
+        soft: 8192
+        hard: 8192
+    restart: unless-stopped
+    volumes:
+      - database:/database
+
+volumes:
+  database:
+  jwt_secret:
